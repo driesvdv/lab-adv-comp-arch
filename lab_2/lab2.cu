@@ -41,7 +41,6 @@ __global__ void reduction(int *input, int *output, int numElementsX, int numElem
             output[idy] = input[idy];
         }
     }
-
 }
 
 /**
@@ -80,8 +79,8 @@ int main(void) {
     // Error code to check return values for CUDA calls
 
     // Define the dimensions of the 2D array
-    int numElementsX = 100000; // Number of elements along the x-axis
-    int numElementsY = 100000; // Number of elements along the y-axis
+    int numElementsX = 5; // Number of elements along the x-axish_output_atomic
+    int numElementsY = 5; // Number of elements along the y-axish_output_atomic
     size_t sizeX = numElementsX * sizeof(int); // Size of each row
 
     // Allocate the host input matrix
@@ -98,7 +97,14 @@ int main(void) {
         h_input[i] = i+1; // Initialize all elements to 1 for simplicity
     }
 
-    // Open CSV file for writing
+    // Print the input matrix
+    printf("Input Matrix:\n");
+    for (int i = 0; i < numElementsX * numElementsY; ++i) {
+        printf("%d ", h_input[i]);
+    }
+    printf("\n");
+
+    // Open CSV file for writingnnnn
     std::ofstream file("timing_data.csv");
     file << "Method,Execution Time (ms)\n";
 
@@ -130,7 +136,7 @@ int main(void) {
     auto end_atomic = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> atomic_time = end_atomic - start_atomic;
 
-    // Copy the result back to host and verify correctness
+    // Copy the result back to host and verify h_output_atomic
     int *h_output_atomic = (int *)malloc(sizeX);
     if (h_output_atomic == NULL) {
         fprintf(stderr, "Failed to allocate host output vector!\n");
@@ -140,6 +146,12 @@ int main(void) {
     if (err != cudaSuccess) {
         fprintf(stderr, "Failed to copy device output vector to host (error code %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
+    }
+
+    // Print highest value in the array per column
+    printf("Atomic Operation - Output Matrix:\n");
+    for (int i = 0; i < numElementsY; ++i) {
+        printf("%d ", h_output_atomic[i]);
     }
 
     // Print and record execution time for atomic operation
@@ -164,6 +176,13 @@ int main(void) {
         fprintf(stderr, "Failed to copy device output vector to host (error code %s)!\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
+
+    // Print highest value in the array per column
+    printf("Reduction Algorithm - Output Matrix:\n");
+    for (int i = 0; i < numElementsY; ++i) {
+        printf("%d ", h_output_reduction[i]);
+    }
+    printf("\n");
 
     // Print and record execution time for reduction algorithm
     printf("Reduction Algorithm - Execution Time: %f ms\n", reduction_time.count());

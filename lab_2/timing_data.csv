@@ -1,0 +1,4 @@
+Method,Execution Time (ms)
+CPU,0.003944
+Atomic Operation,0.131231
+Reduction,0.021453
