@@ -61,7 +61,7 @@ int main(void) {
     // Error code to check return values for CUDA calls
 
     // Define the size of the array
-    int numElements = 2048; // Number of elements in the array
+    int numElements = 1000000; // Number of elements in the array
     size_t size = numElements * sizeof(int); // Size of the array
 
     // Allocate the host input array
@@ -143,25 +143,46 @@ int main(void) {
     // Reset device memory
     cudaMemset(d_output, 0, sizeof(int));
 
-    // Timing for reduction
+    // Split array in chunks
+    int chunkSize = 2048;
+    int numChunks = (int)ceil((float)numElements / chunkSize);
+    int largestValue = 0;
+
     auto start_reduction = std::chrono::high_resolution_clock::now();
-    dim3 blockDim_reduction(1024); // block dimension (assuming each block has 1024 threads)
-    dim3 gridDim_reduction((numElements + blockDim_reduction.x - 1) / blockDim_reduction.x); // grid dimension
-    reduction<<<gridDim_reduction, blockDim_reduction>>>(d_input, d_output, numElements, 1);
-    cudaDeviceSynchronize();
+
+    for (int chunkIndex = 0; chunkIndex < numChunks; ++chunkIndex) {
+        int start = chunkIndex * chunkSize;
+        int end = min(start + chunkSize - 1, numElements - 1); // End index of the current chunk
+
+        // Calculate the size of the current chunk
+        int currentChunkSize = end - start + 1;
+
+        // Timing for reduction
+        dim3 blockDim_reduction(1024); // block dimension (assuming each block has 1024 threads)
+        dim3 gridDim_reduction((currentChunkSize + blockDim_reduction.x - 1) / blockDim_reduction.x); // grid dimension
+        reduction<<<gridDim_reduction, blockDim_reduction>>>(d_input + start, d_output, currentChunkSize, 1);
+        cudaDeviceSynchronize();
+
+        // Copy the result back to host and verify correctness
+        int h_output_reduction;
+        err = cudaMemcpy(&h_output_reduction, d_output, sizeof(int), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) {
+            fprintf(stderr, "Failed to copy device output variable to host (error code %s)!\n", cudaGetErrorString(err));
+            exit(EXIT_FAILURE);
+        }
+
+        // Find the smallest value among the chunk results
+        if (h_output_reduction > largestValue) {
+            largestValue = h_output_reduction;
+        }
+    }
     auto end_reduction = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> reduction_time = end_reduction - start_reduction;
 
-    // Copy the result back to host and verify correctness
-    int h_output_reduction;
-    err = cudaMemcpy(&h_output_reduction, d_output, sizeof(int), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Failed to copy device output variable to host (error code %s)!\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    printf("Smallest value in the array (Reduction): %d\n", largestValue);
 
     // Print and record execution time for reduction
-    printf("Max element in the array (Reduction): %d\n", h_output_reduction);
+    printf("Max element in the array (Reduction): %d\n", largestValue);
     printf("Reduction - Execution Time: %f ms\n", reduction_time.count());
     file << "Reduction," << reduction_time.count() << "\n";
 
