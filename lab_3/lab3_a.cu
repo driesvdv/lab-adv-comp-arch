@@ -88,6 +88,22 @@ __global__ void invert_colors(uint8_t *image, int numPixels) {
 }
 
 
+/**
+ * CUDA Kernel Device code
+ *
+ * Inverts the rgb color of an image
+ */
+__global__ void invert_colors_stride(uint8_t *image, int numPixels) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numPixels) {
+        int startIdx = idx * C;
+        for (int i = 0; i < C; i++) {
+            image[startIdx + i] = 255 - image[startIdx + i]; // Invert each color channel
+        }
+    }
+}
+
+
 int main(void)
 {
     cudaError_t err = cudaSuccess;
@@ -106,7 +122,7 @@ int main(void)
     cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
     // Calculate grid and block dimensions
-    int blockSize = 256;
+    int blockSize = 33;
     int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     // Init timing
@@ -114,6 +130,8 @@ int main(void)
 
     // Launch the kernel to invert colors
     invert_colors<<<numBlocks, blockSize>>>(d_image_array, numPixels);
+
+    cudaDeviceSynchronize();
 
     // End timing
     auto end = std::chrono::high_resolution_clock::now();
@@ -128,7 +146,13 @@ int main(void)
     // Free device memory
     cudaFree(d_image_array);
 
-    // Print timing
+    // Print results
+    int warps = numBlocks * ceil((double)(blockSize) / 32);
+
+    printf("Image size: %d x %d\n", M, N);
+    printf("Warps used: %d\n", warps);
+    printf("Blocks used: %d\n", numBlocks);
+    printf("Threads per block: %d\n", blockSize);
     printf("Time: %f ms\n", duration.count());
 
 
