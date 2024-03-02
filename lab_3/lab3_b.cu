@@ -83,14 +83,14 @@ void save_image_array(uint8_t *image_array)
  */
 __global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride)
 {
-    for (size_t k = 0; k < stride; k++)
+    for (size_t k = 0; k < stride/2; k++)
     {
         int idx = threadIdx.x + k * blockDim.x; // Correct index calculation with stride
-        if (idx < numPixels - 1)
+        if (idx < numPixels)
         {
             if (idx % 3 == 0)
             {
-                image[idx] = (image[idx] % 25) * 10; // Invert each color channel
+                image[idx] = (image[idx] % 25) * 10; // Recalculate Red color channel
             }
             else
             {
@@ -104,56 +104,60 @@ __global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride)
 
 int main(void)
 {
-    // Open CSV file for writingnnnn
-    std::ofstream file("timing_data.csv");
-    file << "Warps, Block size, Execution Time (ms)\n";
+    // Open CSV file for writing
+    std::ofstream file("timing_data_thread_divergence_problem.csv");
+    file << "Threads, Execution Time (µs)\n";
 
     cudaError_t err = cudaSuccess;
 
     // Read the image
     uint8_t *h_image_array = get_image_array();
-
-    // Calculate total number of pixels
-    int numPixels = M * N;
+    int numPixels = M * N * C;
 
     // Allocate memory on the GPU for the image
     uint8_t *d_image_array;
-    cudaMalloc((void **)&d_image_array, numPixels * C * sizeof(uint8_t));
+    cudaMalloc((void **)&d_image_array, numPixels * sizeof(uint8_t));
+    cudaMemcpy(d_image_array, h_image_array, numPixels * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
-    // Copy the image data from host to device
-    cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+    // Define maximum number of threads to test
+    int maxThreads = 1024;
+    for (int threads = 1; threads <= maxThreads; threads *= 2)
+    {
+        // Start the timer
+        auto start = std::chrono::steady_clock::now();
 
-    // Calculate grid and block dimensions
-    int blockSize = 128;
-    int numBlocks = ceil((double)(numPixels * C) / blockSize);
-    int warps = numBlocks * ceil((double)(blockSize) / 32);
+        // Launch the kernel to invert colors
+        invert_colors_stride<<<1, threads>>>(d_image_array, numPixels, numPixels / threads);
 
-    // Launch the kernel to invert colors
-    invert_colors_stride<<<1, blockSize>>>(d_image_array, numPixels * C, numBlocks);
+        // Wait for kernel to finish
+        cudaDeviceSynchronize();
 
+        // Stop the timer
+        auto end = std::chrono::steady_clock::now();
+
+        // Calculate duration in milliseconds
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Write results to CSV file
+        file << threads << ", " << duration << std::endl;
+    }
+
+    // Call function with 256 threads
+    int numStrides = ceil((double)(numPixels) / 256);
+    invert_colors_stride<<<1, 256>>>(d_image_array, numPixels, numStrides);
     cudaDeviceSynchronize();
 
-    // Copy the inverted image data back to host
-    cudaMemcpy(h_image_array, d_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyDeviceToHost);
-
-    // Save the output image
+    // Copy the inverted image data back to host if needed
+    cudaMemcpy(h_image_array, d_image_array, numPixels * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    // Save the output image if needed
     save_image_array(h_image_array);
 
     // Free device memory
     cudaFree(d_image_array);
 
-    // Print results
-    // int warps = numBlocks * ceil((double)(blockSize) / 32);
-
-    // printf("Image size: %d x %d\n", M, N);
-    // printf("Warps used: %d\n", warps);
-    // printf("Blocks used: %d\n", numBlocks);
-    // printf("Threads per block: %d\n", blockSize);
-    // printf("Time: %f ms\n", duration.count());
-
     // Close CSV file
     file.close();
 
-    printf("Done\n");
+    std::cout << "Done" << std::endl;
     return 0;
 }
