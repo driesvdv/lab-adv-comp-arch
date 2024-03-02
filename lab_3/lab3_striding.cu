@@ -86,7 +86,7 @@ __global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride)
     for (size_t k = 0; k < stride; k++)
     {
         int idx = threadIdx.x + k * blockDim.x; // Correct index calculation with stride
-        if (idx + k < numPixels)
+        if (idx < numPixels - 1)
         {
             image[idx] = 255 - image[idx]; // Invert each color channel
         }
@@ -116,8 +116,8 @@ int main(void)
     cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
     // Calculate grid and block dimensions
-    int blockSize = 256;
-    int numBlocks = (numPixels * C + blockSize - 1) / blockSize;
+    int blockSize = 128;
+    int numBlocks = ceil((double)(numPixels * C) / blockSize);
     int warps = numBlocks * ceil((double)(blockSize) / 32);
 
     // Launch the kernel to invert colors
