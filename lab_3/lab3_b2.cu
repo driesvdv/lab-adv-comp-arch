@@ -81,22 +81,28 @@ void save_image_array(uint8_t *image_array)
  *
  * Inverts the rgb color of an image
  */
-__global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride, int channel)
+__global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride)
 {
-    for (size_t k = 0; k < stride; ++k)
-    {
-        int idx = threadIdx.x + k * blockDim.x + k * blockIdx.x; // Correct index calculation with stride
-        if (idx < numPixels)
+    for (int channel = 0; channel < C; ++channel) {    
+        for (size_t k = 0; k < stride; ++k)
         {
-            if(channel == 0)
+            int idx = threadIdx.x + k * blockDim.x; // Correct index calculation with stride
+            if (idx < numPixels)
             {
-                image[idx * C] = (image[idx * C] % 25) * 10; // Calculate red channel
-            }            
-            else
-            {
-                image[idx * C + 1] = 255 - image[idx * C + 1]; // Calculate green channel
-                image[idx * C + 2] = 255 - image[idx * C + 2]; // Calculate blue channel
-            }    
+                if(channel == 0)
+                {
+                    image[idx * C] = (image[idx * C] % 25) * 10; // Calculate red channel
+                    //image[idx * C] = 255 - image[idx * C]; // Calculate red channel
+                }            
+                else if(channel == 1)
+                {
+                    image[idx * C + 1] = 255 - image[idx * C + 1]; // Calculate green channel
+                }    
+                else if (channel == 2)
+                {
+                    image[idx * C + 2] = 255 - image[idx * C + 2]; // Calculate blue channel
+                }            
+            }
         }
     }
 }
@@ -104,10 +110,8 @@ __global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride, 
 int main(void)
 {
     // Open CSV file for writing
-    std::ofstream file("timing_data.csv");
-    file << "Warps, Block size, Execution Time (ms)\n";
-
-    cudaError_t err = cudaSuccess;
+    std::ofstream file("timing_data_divergence_fix.csv");
+    file << "Threads, Execution Time (µs)\n";
 
     // Read the image
     uint8_t *h_image_array = get_image_array();
@@ -122,6 +126,29 @@ int main(void)
     // Copy the image data from host to device
     cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
+       // Loop for different thread counts
+    for (int threads = 1; threads <= 1024; threads *= 2)
+    {
+        // Launch the kernel to invert colors and measure execution time
+        auto start = std::chrono::steady_clock::now();
+
+        invert_colors_stride<<<1, threads>>>(d_image_array, numPixels, numPixels / threads);
+        
+        cudaDeviceSynchronize();
+
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+        // Write timing data to CSV file
+        file << threads << ", " << duration << std::endl;
+    }
+
+    // Allocate memory on the GPU for the image
+    cudaMalloc((void **)&d_image_array, numPixels * C * sizeof(uint8_t));
+
+    // Copy the image data from host to device
+    cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+
     // Calculate grid and block dimensions
     int blockSize = 128;
     int numBlocks = 1;
@@ -129,9 +156,8 @@ int main(void)
     //int warps = numStrides * ceil((double)(blockSize) / 32);
 
     // Launch the kernel to invert colors
-    for (int i=0; i<C; ++i){
-        invert_colors_stride<<<numBlocks, blockSize>>>(d_image_array, numPixels, numStrides, i);
-    }
+    invert_colors_stride<<<numBlocks, blockSize>>>(d_image_array, numPixels, numStrides);
+    
 
     cudaDeviceSynchronize();
 
@@ -143,15 +169,6 @@ int main(void)
 
     // Free device memory
     cudaFree(d_image_array);
-
-    // Print results
-    // int warps = numBlocks * ceil((double)(blockSize) / 32);
-
-    // printf("Image size: %d x %d\n", M, N);
-    // printf("Warps used: %d\n", warps);
-    // printf("Blocks used: %d\n", numBlocks);
-    // printf("Threads per block: %d\n", blockSize);
-    // printf("Time: %f ms\n", duration.count());
 
     // Close CSV file
     file.close();

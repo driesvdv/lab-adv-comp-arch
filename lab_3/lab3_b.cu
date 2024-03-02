@@ -83,21 +83,27 @@ void save_image_array(uint8_t *image_array)
  */
 __global__ void invert_colors_stride(uint8_t *image, int numPixels, int stride)
 {
+    int blockStartIdx = blockIdx.x * blockDim.x * stride; // Calculate the starting index of the block
+
     for (size_t k = 0; k < stride; ++k)
     {
-        int idx = threadIdx.x + k * blockDim.x; // Correct index calculation with stride
-        if (idx < numPixels)
+        int idx = threadIdx.x + blockStartIdx + k * blockDim.x; // Calculate global index
+
+        if (idx < numPixels) // Ensure within image bounds
         {
             if (idx % 3 == 0) // Recalculate red channel
             {
                 image[idx] = (image[idx] % 25) * 10;
+                //image[idx] = 255 - image[idx];
             }
-            else{ //Invert green and blue channels
+            else // Invert green and blue channels
+            {
                 image[idx] = 255 - image[idx];
             }
         }
     }
 }
+
 
 
 int main(void)
@@ -144,10 +150,12 @@ int main(void)
     // Allocate memory on the GPU for the image
     cudaMalloc((void **)&d_image_array, numPixels * sizeof(uint8_t));
     cudaMemcpy(d_image_array, h_image_array, numPixels * sizeof(uint8_t), cudaMemcpyHostToDevice);
+
     // Call function with 256 threads
-    int numStrides = ceil((double)(numPixels) / 256);
+    int numBlocks = 1;
+    int numStrides = ceil((double)(numPixels) / 256 / numBlocks);
     cudaDeviceSynchronize();
-    invert_colors_stride<<<1, 256>>>(d_image_array, numPixels, numStrides);
+    invert_colors_stride<<<numBlocks, 256>>>(d_image_array, numPixels, numStrides);
     cudaDeviceSynchronize();
 
     // Copy the inverted image data back to host if needed
