@@ -5,8 +5,8 @@
 
 // #define M 512       // Lenna width
 // #define N 512       // Lenna height
-#define M 941     // VR width
-#define N 704     // VR height
+#define M 3//941     // VR width
+#define N 3//704     // VR height
 #define C 3       // Colors
 #define OFFSET 15 // Header length
 
@@ -79,41 +79,45 @@ void save_image_array(uint8_t *image_array)
 /**
  * CUDA Kernel Device code
  *
- * Makes the image grayscale by using the average RGB method using coalesced memory access
- */
-__global__ void coalesced_memory_acces(uint8_t *image, int numPixels)
-{
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (idx < numPixels)
-    {
-        // calculate the average grayscale value
-        int gray = (image[idx * C] + image[idx * C + 1] + image[idx * C + 2]) / 3;
-
-        // set the rgb pixels to the newly calculated value
-        image[idx * C] = gray;
-        image[idx * C + 1] = gray;
-        image[idx * C + 2] = gray;
-    }
-}
-
-/**
- * CUDA Kernel Device code
- *
  * Makes the image grayscale by using the average RGB method using non coalesced memory access
  */
-__global__ void non_coalesced_memory_acces(uint8_t *image, int numPixels, int channel)
+__global__ void non_coalesced_memory_acces(uint8_t *image_in, uint8_t *image_out, uint8_t numPixels)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < numPixels)
     {
         // calculate the average grayscale value
-        int gray = (image[idx * C] + image[idx * C + 1] + image[idx * C + 2]) / 3;
-
-        // set the rgb pixels to the newly calculated value
-        image[idx * C] = gray;
+        image_out[idx] = (image_in[idx] + image_in[idx + numPixels] + image_in[idx + numPixels*2]) / 3;
     }
 }
 
+// Reorder the image array to have all r values first, then all g values, then all b values instead of r0, g0, b0, r1, g1, b1, ...
+void reorder_rgb(uint8_t* image_array_in, uint8_t* image_array_out, int num_pixels) {
+    for (int idx = 0; idx < num_pixels; ++idx) {
+        int in_idx = idx * 3;
+        int out_idx_r = idx;
+        int out_idx_g = idx + num_pixels;
+        int out_idx_b = idx + 2 * num_pixels;
+
+        image_array_out[out_idx_r] = image_array_in[in_idx];
+        image_array_out[out_idx_g] = image_array_in[in_idx + 1];
+        image_array_out[out_idx_b] = image_array_in[in_idx + 2];
+    }
+}
+
+// Recreate full rgb image from the grayscale value array by repeating the grayscale value 3 times
+void recreate_rgb(uint8_t* image_array_in, uint8_t* image_array_out, int num_pixels) {
+    for (int idx = 0; idx < num_pixels; ++idx) {
+        int in_idx = idx;
+        int out_idx_r = idx * 3;
+        int out_idx_g = idx * 3 + 1;
+        int out_idx_b = idx * 3 + 2;
+
+        image_array_out[out_idx_r] = image_array_in[in_idx];
+        image_array_out[out_idx_g] = image_array_in[in_idx];
+        image_array_out[out_idx_b] = image_array_in[in_idx];
+    }
+}
 
 
 int main(void)
@@ -123,19 +127,36 @@ int main(void)
     file << "Threads, Execution Time (µs)\n";
 
     // Read the image
-    uint8_t *h_image_array = get_image_array();
+    //uint8_t *h_image_array = get_image_array();
+    // Fake 9 long array as image
+    uint8_t h_image_array[27] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
+
+    // Reorder the image array to have all r values first, then all g values, then all b values instead of r0, g0, b0, r1, g1, b1, ...
+    uint8_t *h_image_array_reordered = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
+    reorder_rgb(h_image_array, h_image_array_reordered, M * N);
+
+    // Print reordered image array
+    printf("Reordered image array: ");
+    for (int i = 0; i < M * N * C; i++) {
+        printf("%d ", h_image_array_reordered[i]);
+    }
+    printf("\n\n");
 
     // Calculate total number of pixels
     int numPixels = M * N;
 
     // Allocate memory on the GPU for the image
-    uint8_t *d_image_array;
+    uint8_t *d_image_array_in;
+    uint8_t *d_image_array_out;
+
 
     // Allocate memory on the GPU for the image
-    cudaMalloc((void **)&d_image_array, numPixels * C * sizeof(uint8_t));
+    cudaMalloc((void **)&d_image_array_in, numPixels * C * sizeof(uint8_t));
+    cudaMalloc((void **)&d_image_array_out, numPixels * sizeof(uint8_t));    
+
 
     // Copy the image data from host to device
-    cudaMemcpy(d_image_array, h_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_image_array_in, h_image_array_reordered, numPixels * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
     // Calculate grid and block dimensions
     int blockSize = 512;
@@ -144,8 +165,8 @@ int main(void)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Launch the kernel to grayscale image using coalesced memory access
-    coalesced_memory_acces<<<numBlocks, blockSize>>>(d_image_array, numPixels);
+    // Launch the kernel to grayscale image using non coalesced memory access
+    non_coalesced_memory_acces<<<numBlocks, blockSize>>>(d_image_array_in, d_image_array_out, numPixels);
 
     cudaDeviceSynchronize();
 
@@ -154,13 +175,18 @@ int main(void)
     printf("Coalesced execution Time: %f µs\n", duration.count());
 
     // Copy the inverted image data back to host
-    cudaMemcpy(h_image_array, d_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_image_array, d_image_array_out, numPixels * C * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+
+    // Recreate full rgb image from the grayscale value array by repeating the grayscale value 3 times
+    uint8_t *h_image_array_recreated = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
+    recreate_rgb(h_image_array, h_image_array_recreated, M * N);
 
     // Save the output image
-    save_image_array(h_image_array);
+    save_image_array(h_image_array_recreated);
 
     // Free device memory
-    cudaFree(d_image_array);
+    cudaFree(d_image_array_in);
+    cudaFree(d_image_array_out);
 
     // Close CSV file
     file.close();
@@ -169,5 +195,5 @@ int main(void)
     return 0;
 }
 
-// order the rgb values in array like this: r0, r1, r2, g1, g2, g3, b1, b2, b3,...
+
 
