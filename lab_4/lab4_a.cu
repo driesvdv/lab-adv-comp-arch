@@ -156,6 +156,12 @@ int main(void)
     // Copy the inverted image data back to host
     cudaMemcpy(h_image_array, d_image_array, numPixels * C * sizeof(uint8_t), cudaMemcpyDeviceToHost);
 
+    // Print output array
+    for (int i = 0; i < 100; i++)
+    {
+        printf("%d ", h_image_array[i]);
+    }
+
     // Save the output image
     save_image_array(h_image_array);
 

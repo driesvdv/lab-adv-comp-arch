@@ -133,14 +133,16 @@ int main(void)
 
     // Reorder the image array to have all r values first, then all g values, then all b values instead of r0, g0, b0, r1, g1, b1, ...
     uint8_t *h_image_array_reordered = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
+    uint8_t *h_image_array_grayscale = (uint8_t *)malloc(M * N * sizeof(uint8_t));
+
     reorder_rgb(h_image_array, h_image_array_reordered, M * N);
 
     // Print reordered image array
-    printf("Reordered image array: ");
-    for (int i = 0; i < M * N * C; i++) {
-        printf("%d ", h_image_array_reordered[i]);
-    }
-    printf("\n\n");
+    // printf("Reordered image array: ");
+    // for (int i = 0; i < 1000; i++) {
+    //     printf("%d ", h_image_array_reordered[i]);
+    // }
+    // printf("\n\n");
 
     // Calculate total number of pixels
     int numPixels = M * N;
@@ -175,14 +177,28 @@ int main(void)
     printf("Coalesced execution Time: %f µs\n", duration.count());
 
     // Copy the inverted image data back to host
-    cudaMemcpy(h_image_array, d_image_array_out, numPixels * C * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_image_array_grayscale, d_image_array_out, numPixels * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+
+    // Print image array
+    printf("Grayscale image array: ");
+    for (int i = 0; i<numPixels; i++) {
+        printf("%d ", h_image_array_grayscale[i]);
+    }
+    printf("\n\n");
 
     // Recreate full rgb image from the grayscale value array by repeating the grayscale value 3 times
     uint8_t *h_image_array_recreated = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
-    recreate_rgb(h_image_array, h_image_array_recreated, M * N);
+    recreate_rgb(h_image_array_grayscale, h_image_array, M * N);
+
+    // Print recreated image array
+    printf("Recreated image array: ");
+    for (int i = 0; i < numPixels * C; i++) {
+        printf("%d ", h_image_array[i]);
+    }
+    printf("\n\n");
 
     // Save the output image
-    save_image_array(h_image_array_recreated);
+    save_image_array(h_image_array);
 
     // Free device memory
     cudaFree(d_image_array_in);
