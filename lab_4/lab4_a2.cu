@@ -5,8 +5,8 @@
 
 // #define M 512       // Lenna width
 // #define N 512       // Lenna height
-#define M 3//941     // VR width
-#define N 3//704     // VR height
+#define M 941     // VR width
+#define N 704     // VR height
 #define C 3       // Colors
 #define OFFSET 15 // Header length
 
@@ -81,7 +81,7 @@ void save_image_array(uint8_t *image_array)
  *
  * Makes the image grayscale by using the average RGB method using non coalesced memory access
  */
-__global__ void non_coalesced_memory_acces(uint8_t *image_in, uint8_t *image_out, uint8_t numPixels)
+__global__ void non_coalesced_memory_acces(uint8_t *image_in, uint8_t *image_out, int numPixels)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < numPixels)
@@ -127,9 +127,9 @@ int main(void)
     file << "Threads, Execution Time (µs)\n";
 
     // Read the image
-    //uint8_t *h_image_array = get_image_array();
+    uint8_t *h_image_array = get_image_array();
     // Fake 9 long array as image
-    uint8_t h_image_array[27] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
+    //uint8_t h_image_array[27] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
 
     // Reorder the image array to have all r values first, then all g values, then all b values instead of r0, g0, b0, r1, g1, b1, ...
     uint8_t *h_image_array_reordered = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
@@ -163,6 +163,11 @@ int main(void)
     // Calculate grid and block dimensions
     int blockSize = 512;
     int numBlocks = ceil((double)(numPixels) / blockSize);
+
+    printf("Number of blocks: %d\n", numBlocks);
+    printf("Number of threads per block: %d\n", blockSize);
+    printf("Number of pixels: %d\n", numPixels);
+    printf("Total number of threads: %d\n", numBlocks * blockSize);
     // int warps = numStrides * ceil((double)(blockSize) / 32);
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -180,11 +185,11 @@ int main(void)
     cudaMemcpy(h_image_array_grayscale, d_image_array_out, numPixels * sizeof(uint8_t), cudaMemcpyDeviceToHost);
 
     // Print image array
-    printf("Grayscale image array: ");
-    for (int i = 0; i<numPixels; i++) {
-        printf("%d ", h_image_array_grayscale[i]);
-    }
-    printf("\n\n");
+    // printf("Grayscale image array: ");
+    // for (int i = 0; i<1000; i++) {
+    //     printf("%d ", h_image_array_grayscale[i]);
+    // }
+    // printf("\n\n");
 
     // Recreate full rgb image from the grayscale value array by repeating the grayscale value 3 times
     uint8_t *h_image_array_recreated = (uint8_t *)malloc(M * N * C * sizeof(uint8_t));
