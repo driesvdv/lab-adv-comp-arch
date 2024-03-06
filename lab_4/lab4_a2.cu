@@ -196,11 +196,11 @@ int main(void)
     recreate_rgb(h_image_array_grayscale, h_image_array, M * N);
 
     // Print recreated image array
-    printf("Recreated image array: ");
-    for (int i = 0; i < numPixels * C; i++) {
-        printf("%d ", h_image_array[i]);
-    }
-    printf("\n\n");
+    // printf("Recreated image array: ");
+    // for (int i = 0; i < numPixels * C; i++) {
+    //     printf("%d ", h_image_array[i]);
+    // }
+    // printf("\n\n");
 
     // Save the output image
     save_image_array(h_image_array);

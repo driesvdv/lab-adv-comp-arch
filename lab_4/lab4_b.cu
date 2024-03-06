@@ -19,6 +19,23 @@ __global__ void matrixMulKernel(int* d_A, int* d_B, int* d_C, int N){
     }
 }
 
+
+template<typename T>
+__global__ void naive_matrix_multiply(const T *A, const T *B, T* C, int width, int P, int Q)
+{
+  int r = blockIdx.y * blockDim.y + threadIdx.y;   
+  int c = blockIdx.x * blockDim.x + threadIdx.x;
+  // check boundry conditions
+  if( r < P && c < Q){
+    // do the multiplication for one row and col
+    T value = 0;
+    for(int k = 0; k < width; k++){
+      value += A[r * width + k] * B[k * Q + c];
+    }
+    // store the result
+    C[r * Q + c] = value;
+  }}
+
 int main(void){
     // Matrix size
     int N = 4;
@@ -39,13 +56,30 @@ int main(void){
     // Initialize matrices
     for(int i = 0; i < N * N; i++){
         h_A[i] = 1;
-        h_B[i] = 1;
+        h_B[i] = i;
     }
 
     // Print matrices
-    for(int i = 0; i < N * N; i++){
-        printf("%d ", h_A[i]);
+    printf("Matrix A\n");
+    for (size_t i = 0; i < N; i++)
+    {
+        for (size_t j = 0; j < N; j++)
+        {
+            printf("%d ", h_A[i * N + j]);
+        }
+        printf("\n");
     }
+    
+    printf("\n\n");
+    printf("Matrix B\n");
+    for(size_t i = 0; i < N; i++){
+        for (size_t j = 0; j < N; j++)
+        {
+            printf("%d ", h_B[i * N + j]);
+        }
+        printf("\n");
+    }
+    printf("\n\n");
 
     // Transfer data to device
     cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice);
@@ -60,10 +94,15 @@ int main(void){
     cudaMemcpy(h_C, d_C, bytes, cudaMemcpyDeviceToHost);
 
     // Print result
-    for(int i = 0; i < N * N; i++){
-        printf("%d ", h_C[i]);
+    printf("Matrix C\n");
+    for(size_t i = 0; i < N; i++){
+        for (size_t j = 0; j < N; j++)
+        {
+            printf("%d ", h_C[i * N + j]);
+        }
+        printf("\n");
     }
-    printf("\n");
+    printf("\n\n");
 
 
     // Free memory
