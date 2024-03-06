@@ -1,10 +1,13 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <chrono>
 
 #define TPB 16  // Thread per block
 
-__constant__ int d_A_const[16 * 16]; // Define constant memory for matrix A
-__constant__ int d_B_const[16 * 16]; // Define constant memory for matrix B
+#define MATRIX_SIZE 512 // Maximum matrix size
+
+__constant__ int d_A_const[MATRIX_SIZE * MATRIX_SIZE]; // Define constant memory for matrix A
+__constant__ int d_B_const[MATRIX_SIZE * MATRIX_SIZE]; // Define constant memory for matrix B
 
 __global__ void matrix_mul_part_global(int widthA, int heightA, int widthB, int* d_C) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -23,42 +26,78 @@ __global__ void matrix_mul_part_global(int widthA, int heightA, int widthB, int*
 }
 
 int main() {
-    int widthA = 4, heightA = 4, widthB = 4;
-    int sizeC = widthB * heightA * sizeof(int);
+    FILE *file = fopen("timing_results_global.csv", "w");
+    if (!file) {
+        printf("Error: Unable to open the file.\n");
+        return 1;
+    }
+    fprintf(file, "Matrix_Size,Execution_Time(us)\n");
 
-    // Host arrays
-    int h_A[16 * 16] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-    int h_B[16 * 16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    int* h_C = (int*)malloc(sizeC);
+    // Number of runs for averaging
+    const int num_runs = 100;
 
-    // Device arrays
-    int* d_C;
-    cudaMalloc(&d_C, sizeC);
+    // Loop through each matrix size
+    for (int size = 2; size <= MATRIX_SIZE; size *= 2) {
+        int widthA = size, heightA = size, widthB = size;
+        int sizeC = widthB * heightA * sizeof(int);
 
-    // Copy matrices to constant memory
-    cudaMemcpyToSymbol(d_A_const, h_A, 16 * 16 * sizeof(int));
-    cudaMemcpyToSymbol(d_B_const, h_B, 16 * 16 * sizeof(int));
+        // Host array for matrix C
+        int* h_C = (int*)malloc(sizeC);
 
-    // Launch kernel
-    dim3 threadsPerBlock(TPB, TPB);
-    dim3 numBlocks((widthB + TPB - 1) / TPB, (heightA + TPB - 1) / TPB);
-    matrix_mul_part_global<<<numBlocks, threadsPerBlock>>>(widthA, heightA, widthB, d_C);
+        // Device array for matrix C
+        int* d_C;
+        cudaMalloc(&d_C, sizeC);
 
-    // Copy result back to host
-    cudaMemcpy(h_C, d_C, sizeC, cudaMemcpyDeviceToHost);
-
-    // Print result
-    printf("Matrix C:\n");
-    for (int i = 0; i < heightA; i++) {
-        for (int j = 0; j < widthB; j++) {
-            printf("%d ", h_C[i * widthB + j]);
+        // Initialize matrices A and B dynamically
+        int* h_A = (int*)malloc(size * size * sizeof(int));
+        int* h_B = (int*)malloc(size * size * sizeof(int));
+        for (int i = 0; i < size * size; ++i) {
+            h_A[i] = 1;
+            h_B[i] = i;
         }
-        printf("\n");
+
+        // Copy matrices A and B to constant memory
+        cudaMemcpyToSymbol(d_A_const, h_A, size * size * sizeof(int));
+        cudaMemcpyToSymbol(d_B_const, h_B, size * size * sizeof(int));
+
+        // Timing accumulator
+        double total_duration = 0.0;
+
+        // Loop for averaging
+        for (int run = 0; run < num_runs; ++run) {
+            // Launch kernel
+            dim3 threadsPerBlock(TPB, TPB);
+            dim3 numBlocks((widthB + TPB - 1) / TPB, (heightA + TPB - 1) / TPB);
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            matrix_mul_part_global<<<numBlocks, threadsPerBlock>>>(widthA, heightA, widthB, d_C);
+
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::micro> duration = end - start;
+
+            // Accumulate timing results
+            total_duration += duration.count();
+
+            // Synchronize to ensure kernel execution is completed
+            cudaDeviceSynchronize();
+        }
+
+        // Calculate average timing results
+        double average_duration = total_duration / num_runs;
+
+        // Write average timing results to CSV file
+        fprintf(file, "%d,%.2f\n", size, average_duration);
+
+        // Free memory
+        free(h_A);
+        free(h_B);
+        free(h_C);
+        cudaFree(d_C);
     }
 
-    // Free memory
-    free(h_C);
-    cudaFree(d_C);
+    // Close the CSV file
+    fclose(file);
 
     return 0;
 }
