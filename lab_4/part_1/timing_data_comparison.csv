@@ -1,0 +1,13 @@
+Method, Threads, Block Size, Average Execution Time (µs)
+Coalesced, 662464, 32, 316.745
+Non-coalesced, 662464, 32, 165.53
+Coalesced, 662464, 64, 203.571
+Non-coalesced, 662464, 64, 73.4119
+Coalesced, 662464, 128, 220.777
+Non-coalesced, 662464, 128, 69.7071
+Coalesced, 662464, 256, 206.526
+Non-coalesced, 662464, 256, 64.616
+Coalesced, 662464, 512, 223.896
+Non-coalesced, 662464, 512, 73.7281
+Coalesced, 662464, 1024, 251.525
+Non-coalesced, 662464, 1024, 85.1798

@@ -26,7 +26,7 @@ uint8_t *get_image_array(void)
      */
     // Try opening the file
     FILE *imageFile;
-    imageFile = fopen("./images/input_image.ppm", "rb");
+    imageFile = fopen("./../images/input_image.ppm", "rb");
     if (imageFile == NULL)
     {
         perror("ERROR: Cannot open input file");
@@ -101,7 +101,7 @@ __global__ void coalesced_memory_acces(uint8_t *image, int numPixels)
  *
  * Makes the image grayscale by using the average RGB method using non coalesced memory access
  */
-__global__ void non_coalesced_memory_acces(uint8_t *image, int numPixels, int channel)
+__global__ void non_coalesced_memory_acces(uint8_t *image, int numPixels)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < numPixels)
@@ -159,7 +159,7 @@ int main(void)
     // Print output array
     for (int i = 0; i < 100; i++)
     {
-        printf("%d ", h_image_array[i]);
+        //printf("%d ", h_image_array[i]);
     }
 
     // Save the output image
