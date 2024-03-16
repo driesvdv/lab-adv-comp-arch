@@ -103,7 +103,7 @@ int main(void)
 {
     // Open CSV file for writing
     std::ofstream file("timing_data_comparison.csv");
-    file << "Method, Threads, Average Execution Time (µs)\n";
+    file << "Method, Threads, Block Size, Average Execution Time (µs)\n";
 
     // Allocate memory for host arrays
     uint8_t *h_image_array = get_image_array();
@@ -119,44 +119,53 @@ int main(void)
     cudaMalloc((void **)&d_image_array_in, M * N * C * sizeof(uint8_t));
     cudaMalloc((void **)&d_image_array_out, M * N * sizeof(uint8_t));
 
-    // Calculate grid and block dimensions
-    int blockSize = 1024;
-    int numBlocks = ceil((double)(M * N) / blockSize);
-
-    // Variables to accumulate execution times
-    float total_duration_coalesced = 0.0f;
-    float total_duration_non_coalesced = 0.0f;
-
-    // Perform 100 runs
-    for (int i = 0; i < 100; ++i)
+    // Perform runs for different block sizes
+    for (int blockSize = 32; blockSize <= 1024; blockSize *= 2)
     {
-        // Copy the image data from host to device
-        cudaMemcpy(d_image_array_in, h_image_array, M * N * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+        // Calculate grid dimensions
+        int numBlocks = ceil((double)(M * N) / blockSize);
 
-        // Timing coalesced memory access
-        auto start_coalesced = std::chrono::high_resolution_clock::now();
-        coalesced_memory_access<<<numBlocks, blockSize>>>(d_image_array_in, d_image_array_out, M * N);
-        cudaDeviceSynchronize();
-        auto end_coalesced = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float, std::micro> duration_coalesced = end_coalesced - start_coalesced;
-        total_duration_coalesced += duration_coalesced.count();
+        // Variables to accumulate execution times
+        float total_duration_coalesced = 0.0f;
+        float total_duration_non_coalesced = 0.0f;
 
-        // Timing non-coalesced memory access
-        auto start_non_coalesced = std::chrono::high_resolution_clock::now();
-        non_coalesced_memory_access<<<numBlocks, blockSize>>>(d_image_array_in, d_image_array_out, M * N);
-        cudaDeviceSynchronize();
-        auto end_non_coalesced = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float, std::micro> duration_non_coalesced = end_non_coalesced - start_non_coalesced;
-        total_duration_non_coalesced += duration_non_coalesced.count();
+        // Perform 100 runs
+        for (int i = 0; i < 100; ++i)
+        {
+            // Copy the image data from host to device and reorder RGB values
+            cudaMemset(d_image_array_in, 0, M * N * C * sizeof(uint8_t));
+            reorder_rgb(h_image_array, h_image_array_reordered, M * N);
+            cudaMemcpy(d_image_array_in, h_image_array_reordered, M * N * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+
+            // Timing coalesced memory access
+            auto start_coalesced = std::chrono::high_resolution_clock::now();
+            coalesced_memory_access<<<numBlocks, blockSize>>>(d_image_array_in, d_image_array_out, M * N);
+            cudaDeviceSynchronize();
+            auto end_coalesced = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<float, std::micro> duration_coalesced = end_coalesced - start_coalesced;
+            total_duration_coalesced += duration_coalesced.count();
+
+            // Reset device memory and copy original input image to device
+            cudaMemset(d_image_array_out, 0, M * N * sizeof(uint8_t));
+            cudaMemcpy(d_image_array_in, h_image_array, M * N * C * sizeof(uint8_t), cudaMemcpyHostToDevice);
+
+            // Timing non-coalesced memory access
+            auto start_non_coalesced = std::chrono::high_resolution_clock::now();
+            non_coalesced_memory_access<<<numBlocks, blockSize>>>(d_image_array_in, d_image_array_out, M * N);
+            cudaDeviceSynchronize();
+            auto end_non_coalesced = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<float, std::micro> duration_non_coalesced = end_non_coalesced - start_non_coalesced;
+            total_duration_non_coalesced += duration_non_coalesced.count();
+        }
+
+        // Calculate average execution times
+        float average_duration_coalesced = total_duration_coalesced / 100.0f;
+        float average_duration_non_coalesced = total_duration_non_coalesced / 100.0f;
+
+        // Write average execution times to CSV file
+        file << "Coalesced, " << M * N << ", " << blockSize << ", " << average_duration_coalesced << "\n";
+        file << "Non-coalesced, " << M * N << ", " << blockSize << ", " << average_duration_non_coalesced << "\n";
     }
-
-    // Calculate average execution times
-    float average_duration_coalesced = total_duration_coalesced / 100.0f;
-    float average_duration_non_coalesced = total_duration_non_coalesced / 100.0f;
-
-    // Write average execution times to CSV file
-    file << "Coalesced, " << M * N << ", " << average_duration_coalesced << "\n";
-    file << "Non-coalesced, " << M * N << ", " << average_duration_non_coalesced << "\n";
 
     // Free device memory
     cudaFree(d_image_array_in);
