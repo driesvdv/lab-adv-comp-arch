@@ -4,7 +4,7 @@
 
 #define TPB 16  // Thread per block
 
-#define MATRIX_SIZE 512 // Maximum matrix size
+#define MATRIX_SIZE 16 // Maximum matrix size
 
 __constant__ int d_A_const[MATRIX_SIZE * MATRIX_SIZE]; // Define constant memory for matrix A
 __constant__ int d_B_const[MATRIX_SIZE * MATRIX_SIZE]; // Define constant memory for matrix B
@@ -26,7 +26,7 @@ __global__ void matrix_mul_part_global(int widthA, int heightA, int widthB, int*
 }
 
 int main() {
-    FILE *file = fopen("timing_results_global.csv", "w");
+    FILE *file = fopen("timing_results_constant.csv", "w");
     if (!file) {
         printf("Error: Unable to open the file.\n");
         return 1;
@@ -88,6 +88,28 @@ int main() {
 
         // Write average timing results to CSV file
         fprintf(file, "%d,%.2f\n", size, average_duration);
+
+        // Copy the result back from device to host
+        cudaMemcpy(h_C, d_C, sizeC, cudaMemcpyDeviceToHost);
+
+        // Save the last result to CSV
+        if (size == 8) {
+            FILE *last_result_file = fopen("last_result_matrix_const.csv", "w");
+            if (!last_result_file) {
+                printf("Error: Unable to open the file.\n");
+                return 1;
+            }
+
+            fprintf(last_result_file, "Result Matrix:\n");
+            for (int i = 0; i < size; ++i) {
+                for (int j = 0; j < size; ++j) {
+                    fprintf(last_result_file, "%d,", h_C[i * size + j]);
+                }
+                fprintf(last_result_file, "\n");
+            }
+
+            fclose(last_result_file);
+        }
 
         // Free memory
         free(h_A);

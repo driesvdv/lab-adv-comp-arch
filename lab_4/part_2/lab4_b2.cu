@@ -42,7 +42,7 @@ __global__ void matrix_mul_part_shared(int* A, int* B, int* C, int widthA, int h
 }
 
 int main() {
-    FILE *file = fopen("timing_results_b2.csv", "w");
+    FILE *file = fopen("timing_results_sharded_mem.csv", "w");
     if (!file) {
         printf("Error: Unable to open the file.\n");
         return 1;

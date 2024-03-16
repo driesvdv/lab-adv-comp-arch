@@ -19,10 +19,30 @@ __global__ void matrixMulKernel(int* d_A, int* d_B, int* d_C, int N){
     }
 }
 
+// Function to write matrix to a CSV file
+void writeMatrixToCSV(int* matrix, int size, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Unable to open the file." << std::endl;
+        return;
+    }
+
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            file << matrix[i * size + j];
+            if (j < size - 1) {
+                file << ",";
+            }
+        }
+        file << std::endl;
+    }
+
+    file.close();
+}
 
 int main(void){
     // Open CSV file to write timing results
-    std::ofstream file("timing_results.csv");
+    std::ofstream file("./timings/timing_results_global_mem.csv");
     if (!file.is_open()) {
         std::cerr << "Error: Unable to open the file." << std::endl;
         return 1;
@@ -36,6 +56,9 @@ int main(void){
 
     // Number of runs for averaging
     const int num_runs = 100;
+
+    // Flag to track if matrix 8x8 has been printed
+    bool printed_matrix_8x8 = false;
 
     // Loop through each matrix size
     for (int size : sizes) {
@@ -63,7 +86,7 @@ int main(void){
             // Initialize matrices
             for(int i = 0; i < N * N; i++){
                 h_A[i] = 1;
-                h_B[i] = i;
+                h_B[i] = 1;
             }
 
             // Transfer data to device
@@ -84,6 +107,14 @@ int main(void){
 
             // Accumulate timing results
             total_duration += duration;
+
+            // Save matrix for size 8x8 if not printed already
+            if (!printed_matrix_8x8 && N == 8) {
+                cudaMemcpy(h_C, d_C, bytes, cudaMemcpyDeviceToHost);
+                std::string filename = "./matrices/matrix_8x8_global.csv";
+                writeMatrixToCSV(h_C, N, filename);
+                printed_matrix_8x8 = true; // Set flag to true after printing
+            }
 
             // Free memory
             free(h_A);
