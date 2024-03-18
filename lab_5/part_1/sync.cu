@@ -9,6 +9,24 @@
  */
 __global__ void summation(int *x, int *y, int numElements)
 {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < numElements)
+    {
+        while (numElements > 1)
+        {
+            if (idx < numElements / 2)
+            {
+                x[idx] += x[idx + numElements / 2];
+            }
+            __syncthreads();
+            numElements /= 2;
+        }
+    }
+    if (idx == 0)
+    {
+        *y = x[0];
+    }
 }
 
 /**
@@ -16,14 +34,53 @@ __global__ void summation(int *x, int *y, int numElements)
  */
 __global__ void multiplication(int *x, int *y, int numElements)
 {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < numElements)
+    {
+        while (numElements > 1)
+        {
+            if (idx < numElements / 2)
+            {
+                x[idx] *= x[idx + numElements / 2];
+            }
+            __syncthreads();
+            numElements /= 2;
+        }
+    }
+    if (idx == 0)
+    {
+        *y = x[0];
+    }
 }
 
 /**
  * CUDA device code for returning the smallest element from array
 
 */
-__global__ void minimum(int *x, int *y, int numElements)
+__global__ void minimum(int *input, int *result, int numElements)
 {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < numElements)
+    {
+        while (numElements > 1)
+        {
+            if (idx < numElements / 2)
+            {
+                if (input[idx] > input[idx + numElements / 2])
+                {
+                    input[idx] = input[idx + numElements / 2];
+                }
+            }
+            __syncthreads();
+            numElements /= 2;
+        }
+    }
+    if (idx == 0)
+    {
+        *result = input[0];
+    }
 }
 
 /**
@@ -110,7 +167,7 @@ int main(void)
     cudaMemcpy(d_arr_4, arr_4, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
 
     // Calculate number of blocks and threads
-    int numThreads = ARR_SIZE < 2048 ? ARR_SIZE/2 : 1024;
+    int numThreads = ARR_SIZE < 2048 ? ARR_SIZE / 2 : 1024;
     int numBlocks = (ARR_SIZE + numThreads - 1) / numThreads;
 
     if (numThreads > 1024)
@@ -151,16 +208,6 @@ int main(void)
     cudaMemcpy(arr_2, d_arr_2, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(arr_3, d_arr_3, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(arr_4, d_arr_4, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Print the results
-    fprintf(stdout, "Maximum: %d\n", out_3);
-
-    // Print first 100 elements of arr_3
-
-    for (int i = 0; i < 10; i++)
-    {
-        fprintf(stdout, "%d ", arr_3[i]);
-    }
 
     // Free the memory
     cudaFree(d_arr_1);
