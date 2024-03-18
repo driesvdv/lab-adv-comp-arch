@@ -178,6 +178,9 @@ int main(void)
     maximum<<<numBlocks, numThreads>>>(d_arr_3, d_out_3, ARR_SIZE);
     minimum<<<numBlocks, numThreads>>>(d_arr_4, d_out_4, ARR_SIZE);
 
+    // Wait for the device to finish
+    cudaDeviceSynchronize();
+
     // Stop the timer
     auto end = std::chrono::high_resolution_clock::now();
 
