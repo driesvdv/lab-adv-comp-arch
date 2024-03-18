@@ -115,6 +115,10 @@ __global__ void maximum(int *input, int *result, int numElements)
 
 int main(void)
 {
+    // Warm up the GPU
+    int *d_arr_x;
+    cudaMalloc((void **)&d_arr_x, 1 * sizeof(int));
+
     // Seed the random number generator
     srand(time(NULL));
 

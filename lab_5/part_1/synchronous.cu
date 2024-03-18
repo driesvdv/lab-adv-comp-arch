@@ -115,6 +115,10 @@ __global__ void maximum(int *input, int *result, int numElements)
 
 int main(void)
 {
+    // Warm up the GPU
+    int *d_arr_x;
+    cudaMalloc((void **)&d_arr_x, 1 * sizeof(int));
+
     // Seed the random number generator
     srand(time(NULL));
 
@@ -146,6 +150,8 @@ int main(void)
     cudaMalloc((void **)&d_arr_2, ARR_SIZE * sizeof(int));
     cudaMalloc((void **)&d_arr_3, ARR_SIZE * sizeof(int));
     cudaMalloc((void **)&d_arr_4, ARR_SIZE * sizeof(int));
+
+
 
     int *d_out_1;
     int *d_out_2;
@@ -194,6 +200,7 @@ int main(void)
 
     // Stop the timer
     auto end = std::chrono::high_resolution_clock::now();
+
 
     // Print the time
     std::chrono::duration<float, std::milli> duration = end - start;
