@@ -118,6 +118,9 @@ int main(void)
     // Seed the random number generator
     srand(time(NULL));
 
+    // Start the timer
+    auto start = std::chrono::high_resolution_clock::now();
+
     // Initialize the arrays
     int arr_1[ARR_SIZE];
     int arr_2[ARR_SIZE];
@@ -154,12 +157,6 @@ int main(void)
     cudaMalloc((void **)&d_out_3, sizeof(int));
     cudaMalloc((void **)&d_out_4, sizeof(int));
 
-    // Copy the arrays to the device
-    cudaMemcpy(d_arr_1, arr_1, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_2, arr_2, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_3, arr_3, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_4, arr_4, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-
     // Calculate number of blocks and threads
     int numThreads = (ARR_SIZE + 1) / 2;
     int numBlocks = (ARR_SIZE + numThreads - 1) / numThreads;
@@ -169,17 +166,51 @@ int main(void)
         throw std::runtime_error("Array size is too large for current implementation. Maximum array size is 1024 elements.");
     }
 
-    // Start the timer
-    auto start = std::chrono::high_resolution_clock::now();
+    /// Create CUDA streams
+    cudaStream_t stream1, stream2, stream3, stream4;
+    cudaStreamCreate(&stream1);
+    cudaStreamCreate(&stream2);
+    cudaStreamCreate(&stream3);
+    cudaStreamCreate(&stream4);
 
-    // Perform the operations
-    summation<<<numBlocks, numThreads>>>(d_arr_1, d_out_1, ARR_SIZE);
-    multiplication<<<numBlocks, numThreads>>>(d_arr_2, d_out_2, ARR_SIZE);
-    maximum<<<numBlocks, numThreads>>>(d_arr_3, d_out_3, ARR_SIZE);
-    minimum<<<numBlocks, numThreads>>>(d_arr_4, d_out_4, ARR_SIZE);
+    // Perform the operations with streams
+    cudaMemcpyAsync(d_arr_1, arr_1, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice, stream1);
+    summation<<<numBlocks, numThreads, 0, stream1>>>(d_arr_1, d_out_1, ARR_SIZE);
+
+    cudaMemcpyAsync(d_arr_2, arr_2, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice, stream2);
+    multiplication<<<numBlocks, numThreads, 0, stream2>>>(d_arr_2, d_out_2, ARR_SIZE);
+
+    cudaMemcpyAsync(d_arr_3, arr_3, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice, stream3);
+    maximum<<<numBlocks, numThreads, 0, stream3>>>(d_arr_3, d_out_3, ARR_SIZE);
+
+    cudaMemcpyAsync(d_arr_4, arr_4, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice, stream4);
+    minimum<<<numBlocks, numThreads, 0, stream4>>>(d_arr_4, d_out_4, ARR_SIZE);
+
+    // Wait for all streams to finish
+    cudaStreamSynchronize(stream1);
+    cudaStreamSynchronize(stream2);
+    cudaStreamSynchronize(stream3);
+    cudaStreamSynchronize(stream4);
+
+    // Destroy the streams after use
+    cudaStreamDestroy(stream1);
+    cudaStreamDestroy(stream2);
+    cudaStreamDestroy(stream3);
+    cudaStreamDestroy(stream4);
 
     // Wait for the device to finish
     cudaDeviceSynchronize();
+
+    // Copy the results back to the host asynchronously
+    int out_1;
+    int out_2;
+    int out_3;
+    int out_4;
+
+    cudaMemcpyAsync(&out_1, d_out_1, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(&out_2, d_out_2, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(&out_3, d_out_3, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(&out_4, d_out_4, sizeof(int), cudaMemcpyDeviceToHost);
 
     // Stop the timer
     auto end = std::chrono::high_resolution_clock::now();
@@ -187,24 +218,7 @@ int main(void)
     // Print the time
     std::chrono::duration<float, std::milli> duration = end - start;
 
-    fprintf(stdout, "Execution time synchronous approach: %f ms\n", duration.count());
-
-    // Copy the results back to the host
-    int out_1;
-    int out_2;
-    int out_3;
-    int out_4;
-
-    cudaMemcpy(&out_1, d_out_1, sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&out_2, d_out_2, sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&out_3, d_out_3, sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&out_4, d_out_4, sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Copy back input arrays
-    cudaMemcpy(arr_1, d_arr_1, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(arr_2, d_arr_2, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(arr_3, d_arr_3, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemcpy(arr_4, d_arr_4, ARR_SIZE * sizeof(int), cudaMemcpyDeviceToHost);
+    fprintf(stdout, "Execution time asynchronous approach: %f ms\n", duration.count());
 
     // Free the memory
     cudaFree(d_arr_1);
