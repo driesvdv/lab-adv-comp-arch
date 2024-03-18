@@ -122,9 +122,6 @@ int main(void)
     // Seed the random number generator
     srand(time(NULL));
 
-    // Start the timer
-    auto start = std::chrono::high_resolution_clock::now();
-
     // Initialize the arrays
     int arr_1[ARR_SIZE];
     int arr_2[ARR_SIZE];
@@ -177,6 +174,9 @@ int main(void)
     cudaStreamCreate(&stream3);
     cudaStreamCreate(&stream4);
 
+    // Start the timer
+    auto start = std::chrono::high_resolution_clock::now();
+
     // Perform the operations with streams
     cudaMemcpyAsync(d_arr_1, arr_1, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice, stream1);
     summation<<<numBlocks, numThreads, 0, stream1>>>(d_arr_1, d_out_1, ARR_SIZE);
@@ -195,6 +195,9 @@ int main(void)
     cudaStreamSynchronize(stream2);
     cudaStreamSynchronize(stream3);
     cudaStreamSynchronize(stream4);
+
+    // Stop the timer
+    auto end = std::chrono::high_resolution_clock::now();
 
     // Destroy the streams after use
     cudaStreamDestroy(stream1);
@@ -216,13 +219,10 @@ int main(void)
     cudaMemcpyAsync(&out_3, d_out_3, sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpyAsync(&out_4, d_out_4, sizeof(int), cudaMemcpyDeviceToHost);
 
-    // Stop the timer
-    auto end = std::chrono::high_resolution_clock::now();
-
     // Print the time
-    std::chrono::duration<float, std::milli> duration = end - start;
+    std::chrono::duration<float, std::micro> duration = end - start;
 
-    fprintf(stdout, "Execution time asynchronous approach: %f ms\n", duration.count());
+    fprintf(stdout, "Execution time asynchronous approach: %f µs\n", duration.count());
 
     // Free the memory
     cudaFree(d_arr_1);

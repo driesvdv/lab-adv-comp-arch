@@ -122,9 +122,6 @@ int main(void)
     // Seed the random number generator
     srand(time(NULL));
 
-    // Start the timer
-    auto start = std::chrono::high_resolution_clock::now();
-
     // Initialize the arrays
     int arr_1[ARR_SIZE];
     int arr_2[ARR_SIZE];
@@ -151,8 +148,6 @@ int main(void)
     cudaMalloc((void **)&d_arr_3, ARR_SIZE * sizeof(int));
     cudaMalloc((void **)&d_arr_4, ARR_SIZE * sizeof(int));
 
-
-
     int *d_out_1;
     int *d_out_2;
     int *d_out_3;
@@ -163,12 +158,6 @@ int main(void)
     cudaMalloc((void **)&d_out_3, sizeof(int));
     cudaMalloc((void **)&d_out_4, sizeof(int));
 
-    // Copy the arrays to the device
-    cudaMemcpy(d_arr_1, arr_1, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_2, arr_2, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_3, arr_3, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr_4, arr_4, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
-
     // Calculate number of blocks and threads
     int numThreads = (ARR_SIZE + 1) / 2;
     int numBlocks = (ARR_SIZE + numThreads - 1) / numThreads;
@@ -178,6 +167,15 @@ int main(void)
         throw std::runtime_error("Array size is too large for current implementation. Maximum array size is 1024 elements.");
     }
 
+    // Start the timer
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Copy the arrays to the device
+    cudaMemcpy(d_arr_1, arr_1, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr_2, arr_2, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr_3, arr_3, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr_4, arr_4, ARR_SIZE * sizeof(int), cudaMemcpyHostToDevice);
+
     // Perform the operations
     summation<<<numBlocks, numThreads>>>(d_arr_1, d_out_1, ARR_SIZE);
     multiplication<<<numBlocks, numThreads>>>(d_arr_2, d_out_2, ARR_SIZE);
@@ -186,6 +184,9 @@ int main(void)
 
     // Wait for the device to finish
     cudaDeviceSynchronize();
+
+    // Stop the timer
+    auto end = std::chrono::high_resolution_clock::now();
 
     // Copy the results back to the host
     int out_1;
@@ -198,14 +199,10 @@ int main(void)
     cudaMemcpy(&out_3, d_out_3, sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(&out_4, d_out_4, sizeof(int), cudaMemcpyDeviceToHost);
 
-    // Stop the timer
-    auto end = std::chrono::high_resolution_clock::now();
-
-
     // Print the time
-    std::chrono::duration<float, std::milli> duration = end - start;
+    std::chrono::duration<float, std::micro> duration = end - start;
 
-    fprintf(stdout, "Execution time synchronous approach: %f ms\n", duration.count());
+    fprintf(stdout, "Execution time synchronous approach: %f µs\n", duration.count());
 
     // Free the memory
     cudaFree(d_arr_1);
