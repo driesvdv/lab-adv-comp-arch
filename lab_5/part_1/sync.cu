@@ -133,12 +133,6 @@ int main(void)
         arr_4[i] = rand() % 1000;
     }
 
-    // Print first 100 elements of arr_3
-    for (int i = 0; i < 10; i++)
-    {
-        fprintf(stdout, "%d ", arr_3[i]);
-    }
-
     // Allocate memory on the device
     int *d_arr_1;
     int *d_arr_2;
