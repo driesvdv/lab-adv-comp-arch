@@ -120,7 +120,7 @@ int main(void)
     cudaMalloc((void **)&d_image_array_out, M * N * sizeof(uint8_t));
 
     // Perform runs for different block sizes
-    for (int blockSize = 32; blockSize <= 1024; blockSize *= 2)
+    for (int blockSize = 32; blockSize <= 1024; blockSize += 2)
     {
         // Calculate grid dimensions
         int numBlocks = ceil((double)(M * N) / blockSize);
