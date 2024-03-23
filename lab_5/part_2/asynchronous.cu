@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <stdexcept>
 
-#define ARR_SIZE 2048
+#define ARR_SIZE 100000
 
 /**
  * CUDA device code for performing element wise summation opperation to array
@@ -160,6 +160,8 @@ int main(void)
 
     // Calculate number of blocks and threads
     int numThreads = (ARR_SIZE + 1) / 2;
+    int numThreadsMax = 1024;
+    numThreads = numThreads > numThreadsMax ? numThreadsMax : numThreads;
     int numBlocks = (ARR_SIZE + numThreads - 1) / numThreads;
 
     if (numThreads > 1024)
