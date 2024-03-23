@@ -5,10 +5,10 @@
 #include <iostream>
 #include <vector>
 
-#define ARR_SIZE_MAX 100000000
+#define ARR_SIZE_MAX 1000000000
 #define ARR_SIZE_MIN 10
 #define ARR_SIZE_STEP 10
-#define NUM_RUNS 4
+#define NUM_RUNS 2
 
 /**
  * CUDA device code for performing element-wise summation operation on array

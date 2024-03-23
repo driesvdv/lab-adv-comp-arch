@@ -8,7 +8,7 @@
 #define ARR_SIZE_MAX 100000000
 #define ARR_SIZE_MIN 10
 #define ARR_SIZE_STEP 10
-#define NUM_ITERATIONS 4
+#define NUM_ITERATIONS 2
 
 /**
  * CUDA device code for performing element-wise summation operation on array
