@@ -147,7 +147,6 @@ int main(void)
             // Start the timer for the operations
             auto start_operations = std::chrono::high_resolution_clock::now();
 
-
             // Create CUDA streams
             cudaStream_t stream1, stream2, stream3, stream4;
             cudaStreamCreate(&stream1);
@@ -168,6 +167,7 @@ int main(void)
             cudaMalloc((void **)&d_out_1, sizeof(int));
 
             cudaMemcpyAsync(d_arr_1, arr_1.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice, stream1);
+            summation<<<numBlocks, numThreads, 0, stream1>>>(d_arr_1, d_out_1, arr_size);
 
             std::vector<int> arr_2(arr_size);
             for (int i = 0; i < arr_size; i++)
@@ -180,6 +180,7 @@ int main(void)
             cudaMalloc((void **)&d_out_2, sizeof(int));
 
             cudaMemcpyAsync(d_arr_2, arr_2.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice, stream2);
+            multiplication<<<numBlocks, numThreads, 0, stream2>>>(d_arr_2, d_out_2, arr_size);
 
             std::vector<int> arr_3(arr_size);
             for (int i = 0; i < arr_size; i++)
@@ -192,6 +193,7 @@ int main(void)
             cudaMalloc((void **)&d_out_3, sizeof(int));
 
             cudaMemcpyAsync(d_arr_3, arr_3.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice, stream3);
+            maximum<<<numBlocks, numThreads, 0, stream3>>>(d_arr_3, d_out_3, arr_size);
 
             std::vector<int> arr_4(arr_size);
             for (int i = 0; i < arr_size; i++)
@@ -204,11 +206,6 @@ int main(void)
             cudaMalloc((void **)&d_out_4, sizeof(int));
 
             cudaMemcpyAsync(d_arr_4, arr_4.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice, stream4);
-
-            // Perform operations asynchronously
-            summation<<<numBlocks, numThreads, 0, stream1>>>(d_arr_1, d_out_1, arr_size);
-            multiplication<<<numBlocks, numThreads, 0, stream2>>>(d_arr_2, d_out_2, arr_size);
-            maximum<<<numBlocks, numThreads, 0, stream3>>>(d_arr_3, d_out_3, arr_size);
             minimum<<<numBlocks, numThreads, 0, stream4>>>(d_arr_4, d_out_4, arr_size);
 
             // Synchronize streams
@@ -225,7 +222,6 @@ int main(void)
 
             auto end_operations = std::chrono::high_resolution_clock::now();
             total_time += std::chrono::duration_cast<std::chrono::microseconds>(end_operations - start_operations).count();
-
 
             // Free device memory
             cudaFree(d_arr_1);
