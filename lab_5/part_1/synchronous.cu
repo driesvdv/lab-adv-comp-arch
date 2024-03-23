@@ -3,9 +3,12 @@
 #include <stdexcept>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
-#define ARR_SIZE_MAX 100000
-#define NUM_ITERATIONS 100
+#define ARR_SIZE_MAX 100000000
+#define ARR_SIZE_MIN 10
+#define ARR_SIZE_STEP 10
+#define NUM_ITERATIONS 4
 
 /**
  * CUDA device code for performing element-wise summation operation on array
@@ -151,13 +154,13 @@ int main(void)
         {
             auto start_data_prep = std::chrono::high_resolution_clock::now();
 
-            // Allocate memory for host arrays
-            int *arr_1 = new int[arr_size];
-            int *arr_2 = new int[arr_size];
-            int *arr_3 = new int[arr_size];
-            int *arr_4 = new int[arr_size];
+            // Allocate memory for host vectors
+            std::vector<int> arr_1(arr_size);
+            std::vector<int> arr_2(arr_size);
+            std::vector<int> arr_3(arr_size);
+            std::vector<int> arr_4(arr_size);
 
-            // Fill host arrays with random numbers
+            // Fill host vectors with random numbers
             for (int i = 0; i < arr_size; i++)
             {
                 arr_1[i] = rand() % 1000;
@@ -173,11 +176,11 @@ int main(void)
             cudaMalloc((void **)&d_arr_3, arr_size * sizeof(int));
             cudaMalloc((void **)&d_arr_4, arr_size * sizeof(int));
 
-            // Copy host arrays to device
-            cudaMemcpy(d_arr_1, arr_1, arr_size * sizeof(int), cudaMemcpyHostToDevice);
-            cudaMemcpy(d_arr_2, arr_2, arr_size * sizeof(int), cudaMemcpyHostToDevice);
-            cudaMemcpy(d_arr_3, arr_3, arr_size * sizeof(int), cudaMemcpyHostToDevice);
-            cudaMemcpy(d_arr_4, arr_4, arr_size * sizeof(int), cudaMemcpyHostToDevice);
+            // Copy host vectors to device
+            cudaMemcpy(d_arr_1, arr_1.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_arr_2, arr_2.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_arr_3, arr_3.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_arr_4, arr_4.data(), arr_size * sizeof(int), cudaMemcpyHostToDevice);
             cudaDeviceSynchronize();
             auto end_data_prep = std::chrono::high_resolution_clock::now();
             data_prep_time += std::chrono::duration_cast<std::chrono::microseconds>(end_data_prep - start_data_prep).count();
@@ -212,12 +215,6 @@ int main(void)
             cudaFree(d_arr_2);
             cudaFree(d_arr_3);
             cudaFree(d_arr_4);
-
-            // Free host memory
-            delete[] arr_1;
-            delete[] arr_2;
-            delete[] arr_3;
-            delete[] arr_4;
         }
 
         // Compute average time for each operation
