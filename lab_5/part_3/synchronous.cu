@@ -24,7 +24,7 @@ __global__ void summation(int *x, int *y, int numElements)
             if (idx < numElements / 2)
             {
                 int temp = 0;
-                for (size_t i = 0; i < 100000000; i++)
+                for (size_t i = 0; i < 100000000000000; i++)
                 {
                     temp += i;
                 }
@@ -54,7 +54,7 @@ __global__ void multiplication(int *x, int *y, int numElements)
             if (idx < numElements / 2)
             {
                 int temp = 0;
-                for (size_t i = 0; i < 100000000; i++)
+                for (size_t i = 0; i < 100000000000000; i++)
                 {
                     temp += i;
                 }
@@ -86,7 +86,7 @@ __global__ void minimum(int *input, int *result, int numElements)
                 if (input[idx] > input[idx + numElements / 2])
                 {
                     int temp = 0;
-                    for (size_t i = 0; i < 100000000; i++)
+                    for (size_t i = 0; i < 100000000000000; i++)
                     {
                         temp += i;
                     }
@@ -119,7 +119,7 @@ __global__ void maximum(int *input, int *result, int numElements)
                 if (input[idx] < input[idx + numElements / 2])
                 {
                     int temp = 0;
-                    for (size_t i = 0; i < 100000000; i++)
+                    for (size_t i = 0; i < 100000000000000; i++)
                     {
                         temp += i;
                     }
